@@ -1,0 +1,54 @@
+# Somente depois de validar provisionamento dinâmico; cria 2 EBS adicionais.
+apiVersion: v1
+kind: Service
+metadata:
+  name: registros
+  namespace: curso-storage
+spec:
+  clusterIP: None
+  selector: {app: registro}
+  ports: [{name: identidade, port: 8080, targetPort: 8080}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: registro
+  namespace: curso-storage
+spec:
+  serviceName: registros
+  replicas: 2
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels: {app: registro}
+  template:
+    metadata:
+      labels: {app: registro}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: registro
+          image: busybox:1.37.0
+          command: [sh, -c, "sleep 86400"]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts: [{name: dados, mountPath: /dados}]
+  volumeClaimTemplates:
+    - metadata:
+        name: dados
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: curso-ebs-gp3
+        resources:
+          requests: {storage: 4Gi}

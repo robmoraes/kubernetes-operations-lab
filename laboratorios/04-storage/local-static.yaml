@@ -1,0 +1,40 @@
+# ALTERNATIVA ao ebs-static.yaml, não aplicar ambos no mesmo namespace.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: curso-local
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: curso-local
+spec:
+  capacity:
+    storage: 4Gi
+  volumeMode: Filesystem
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: curso-local
+  local:
+    path: /srv/curso-storage
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values: [SUBSTITUA_HOSTNAME_WORKER]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dados
+  namespace: curso-storage
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: curso-local
+  resources:
+    requests:
+      storage: 4Gi

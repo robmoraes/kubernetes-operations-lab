@@ -1,0 +1,44 @@
+# Arquivo de values, não é um objeto Kubernetes. Use helm -f, não kubectl apply.
+# Contrato do chart oficial traefik/traefik 41.5.0, appVersion v3.7.13.
+deployment:
+  replicas: 2
+providers:
+  kubernetesIngress:
+    enabled: true
+  kubernetesCRD:
+    enabled: false
+  kubernetesGateway:
+    enabled: true
+    experimentalChannel: false
+ingressClass:
+  enabled: true
+  isDefaultClass: false
+  name: traefik
+gateway:
+  enabled: false
+gatewayClass:
+  enabled: true
+  name: traefik
+service:
+  type: ClusterIP
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+  websecure:
+    port: 8443
+    exposedPort: 443
+api:
+  dashboard: false
+ingressRoute:
+  dashboard:
+    enabled: false
+accessLog:
+  enabled: true
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

@@ -1,0 +1,26 @@
+# Substitui a rota HTTP Ingress do exercício por HTTPS.
+# Requer o Secret web-tls, criado localmente conforme a aula03.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: curso
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - web.curso.test
+      secretName: web-tls
+  rules:
+    - host: web.curso.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

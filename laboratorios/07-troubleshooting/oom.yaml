@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oom-treino
+  namespace: curso-incidentes
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: memoria
+      image: python:3.13-alpine
+      command: [python, -c, "import time; time.sleep(5); x = bytearray(128 * 1024 * 1024); time.sleep(60)"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 64Mi}

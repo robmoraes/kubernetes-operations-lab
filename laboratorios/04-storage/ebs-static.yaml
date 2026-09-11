@@ -1,0 +1,39 @@
+# PREENCHER: use apenas um volume EBS novo e vazio do laboratório.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: curso-ebs
+spec:
+  capacity:
+    storage: 4Gi
+  volumeMode: Filesystem
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    namespace: curso-storage
+    name: dados
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: SUBSTITUA_VOLUME_ID
+    fsType: ext4
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: topology.ebs.csi.aws.com/zone
+              operator: In
+              values: [SUBSTITUA_AZ]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dados
+  namespace: curso-storage
+spec:
+  accessModes: [ReadWriteOnce]
+  volumeName: curso-ebs
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 4Gi

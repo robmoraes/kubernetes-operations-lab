@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cliente-para-web
+  namespace: curso-seguranca
+spec:
+  podSelector:
+    matchLabels: {papel: cliente}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: web-seguro}
+      ports: [{protocol: TCP, port: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-recebe-cliente
+  namespace: curso-seguranca
+spec:
+  podSelector:
+    matchLabels: {app: web-seguro}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {papel: cliente}
+      ports: [{protocol: TCP, port: 8080}]

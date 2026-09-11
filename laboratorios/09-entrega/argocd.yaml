@@ -1,0 +1,37 @@
+# Edite as duas ocorrências de URL antes de aplicar. Namespace argocd já deve existir.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: curso
+  namespace: argocd
+spec:
+  sourceRepos:
+    - https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
+  destinations:
+    - namespace: curso-entrega
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: curso-web
+  namespace: argocd
+spec:
+  project: curso
+  source:
+    repoURL: https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
+    targetRevision: main
+    path: laboratorios/09-entrega/kustomize/overlays/lab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: curso-entrega
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

@@ -1,0 +1,21 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadMetadata",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeVolumes", "ec2:DescribeInstances", "ec2:DescribeAvailabilityZones", "ec2:DescribeTags", "ec2:DescribeVolumeStatus", "ec2:DescribeVolumesModifications", "ec2:DescribeInstanceTypes"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AttachOnlyTheLabVolumeToItsWorkers",
+      "Effect": "Allow",
+      "Action": ["ec2:AttachVolume", "ec2:DetachVolume"],
+      "Resource": [
+        "arn:aws:ec2:REGIAO:CONTA:volume/VOLUME_ID",
+        "arn:aws:ec2:REGIAO:CONTA:instance/WORKER_1_ID",
+        "arn:aws:ec2:REGIAO:CONTA:instance/WORKER_2_ID"
+      ]
+    }
+  ]
+}

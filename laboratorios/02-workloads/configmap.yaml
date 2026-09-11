@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-conteudo
+  namespace: curso
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="pt-BR"><meta charset="utf-8"><title>Curso Kubernetes</title>
+    <h1>Aplicacao web do curso — versao 1</h1>
+    <p>Resposta servida por um Pod, descoberto pelo Service web.</p></html>
+  healthz: "ok\n"
+  readyz: "ready\n"

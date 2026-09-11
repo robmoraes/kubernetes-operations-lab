@@ -1,0 +1,21 @@
+# Somente alternativa didática: UM HAProxy é ponto único de falha.
+# Para HA na AWS, use o NLB multi-AZ descrito no capítulo.
+# Substitua estes endereços pelos IPs PRIVADOS dos control planes do laboratório.
+global
+    log /dev/log local0
+    maxconn 2048
+defaults
+    log global
+    mode tcp
+    timeout connect 5s
+    timeout client 1m
+    timeout server 1m
+frontend kubernetes_api
+    bind *:6443
+    default_backend control_planes
+backend control_planes
+    balance roundrobin
+    option tcp-check
+    server cp1 10.80.10.10:6443 check
+    server cp2 10.80.20.10:6443 check
+    server cp3 10.80.30.10:6443 check

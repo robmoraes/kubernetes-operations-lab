@@ -1,0 +1,29 @@
+groups:
+  - name: curso-disponibilidade
+    rules:
+      - alert: WebIndisponivel
+        expr: probe_success{job="web-blackbox"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sonda HTTP do curso falha há pelo menos um minuto
+          runbook: curso/12-sre.md
+      - alert: ColetaWebAusente
+        expr: up{job="web-blackbox"} == 0 or absent(probe_success{job="web-blackbox"})
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Não há dados confiáveis da sonda HTTP
+      - alert: WebConsumoRapidoDeOrcamento
+        expr: |
+          ((1 - avg_over_time(probe_success{job="web-blackbox"}[1h])) / 0.001 > 14.4)
+          and
+          ((1 - avg_over_time(probe_success{job="web-blackbox"}[5m])) / 0.001 > 14.4)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Sonda consome orçamento de erro de 99,9% rapidamente
+          description: Aproximação didática por amostras; não é contagem de requisições reais.

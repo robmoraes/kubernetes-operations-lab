@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: curso-manutencao
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prova
+  namespace: curso-manutencao
+data:
+  fase: antes
+  finalidade: demonstrar-retorno-do-snapshot

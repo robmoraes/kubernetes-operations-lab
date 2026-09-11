@@ -1,0 +1,8 @@
+# Valores Helm, não um objeto Kubernetes. Confirme a versão do chart na aula.
+controller:
+  region: sa-east-1
+  replicaCount: 1
+  nodeSelector:
+    curso.ebs/controller: "true"
+node:
+  enableWindows: false

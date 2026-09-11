@@ -1,0 +1,9 @@
+replicaCount: 2
+image: nginxinc/nginx-unprivileged:1.27-alpine
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
