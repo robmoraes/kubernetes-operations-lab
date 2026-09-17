@@ -10,6 +10,7 @@ Execute os arquivos individualmente na ordem da [aula 03](../../curso/03-rede.md
 | gateway.yaml | kubectl | GatewayClass traefik |
 | httproute.yaml | kubectl | Gateway web-gateway e Service web |
 | extras/ingress-tls.yaml | kubectl | Secret web-tls criado pelo aluno |
+| extras/gateway-tls.yaml | kubectl | Secret gateway-tls criado pelo aluno; adiciona listener HTTPS e parentRef |
 
 `traefik-values.yaml` não é um manifesto Kubernetes; por isso, não aplique o diretório inteiro com kubectl. O chart cria a GatewayClass; o aluno cria Gateway e HTTPRoute para compreender a separação de responsabilidades.
 

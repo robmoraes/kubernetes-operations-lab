@@ -1,0 +1,16 @@
+# Chart metrics-server 3.13.0 / aplicação 0.8.0, Kubernetes 1.35.
+# As duas conexões TLS são validadas: API Server -> Metrics Server -> kubelets.
+apiService:
+  insecureSkipTLSVerify: false
+tls:
+  type: helm
+  helm:
+    lookup: true
+    certDurationDays: 365
+defaultArgs:
+  - --cert-dir=/tmp
+  - --kubelet-preferred-address-types=InternalIP
+  - --kubelet-use-node-status-port
+  - --metric-resolution=15s
+args:
+  - --kubelet-certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt

@@ -1,0 +1,45 @@
+# DADOS PÚBLICOS DE TREINAMENTO: não substituir por senhas ou tokens reais.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: segredo-ficticio
+  namespace: curso-seguranca
+type: Opaque
+stringData:
+  mensagem: valor-publico-ficticio-v1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: consumidor-segredo
+  namespace: curso-seguranca
+spec:
+  serviceAccountName: leitor
+  automountServiceAccountToken: false
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: consumidor
+      image: busybox:1.37.0
+      command: [sh, -c, "sleep 86400"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 100m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: segredo
+          mountPath: /var/run/segredo
+          readOnly: true
+  volumes:
+    - name: segredo
+      secret:
+        secretName: segredo-ficticio
+        defaultMode: 0444

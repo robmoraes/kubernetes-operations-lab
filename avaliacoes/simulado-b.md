@@ -2,13 +2,17 @@
 
 Tempo: **120 minutos**, após preparar o ambiente. Pontuação: **100**. Use um **cluster kubeadm descartável com 1 CP e 2 workers**, independente do cluster HA do módulo 10. A recuperação altera o estado inteiro da API; não a execute no ambiente compartilhado dos outros módulos.
 
-Pré-requisitos: módulos 01–10, SSH/sudo, `crictl` funcional, `etcdctl` e `etcdutl` compatíveis, CNI/DNS saudáveis, cliente compatível, Traefik e Gateway API da aula03 instalados. Leia o procedimento de restore do módulo 08 antes da prova; aqui será executado autonomamente. O exame cobre parte da administração; complete upgrade real e HA nos laboratórios além desta avaliação.
+Pré-requisitos: módulos 01–10, SSH/sudo, `crictl` funcional, `etcdctl` e `etcdutl` compatíveis, CNI/DNS saudáveis, cliente compatível, Traefik e Gateway API da aula 03 instalados. O procedimento de restore do módulo 08 deve ter sido praticado antes da prova; aqui será executado autonomamente. O exame cobre parte da administração; complete upgrade real e HA nos laboratórios além desta avaliação.
 
 ## Preparação fora do relógio
 
+Use a preparação do **cluster auxiliar** descrita no módulo 08, começando em Kubernetes 1.35 e com utilitários da versão efetiva do etcd. Se descartou aquele ambiente depois do upgrade, reconstrua o auxiliar antes do relógio; não substitua por restore no principal HA. Instale também o Traefik/Gateway API do módulo 03 nesse auxiliar. Escolha e registre endpoint/kubeconfig/contexto exclusivos para a avaliação.
+
+Os nomes do runbook 08 são exemplos, não alvos universais. Neste simulado o marcador é `ConfigMap/prova-b/marcador`, não `curso-manutencao/prova`. Substitua as referências ao marcador, endpoint e kubeconfig pelos valores registrados da prova. Preserve os cuidados de snapshot, PKI, pausa dos componentes, diretório novo e validação; não execute o upgrade do módulo 08 durante estes 120 minutos.
+
 Crie namespace `prova-b`, ConfigMap `marcador` com `fase=antes` e Deployment `web` com duas réplicas HTTP (pode adaptar o módulo 02), Service porta 80 e requests baixos. Confirme HTTP entre nós. Defina a variável `WORKER_TESTE` com o nome exato de um dos workers e anote o contexto. Garanta capacidade para as duas réplicas no worker restante e não crie PVC local para essa aplicação.
 
-O diretório privado para backups fica **fora do Git**. Registre IP/nome do membro etcd, paths de certificados, endpoints e mounts lidos do manifesto existente. Prepare uma cópia protegida da PKI e configuração da VM para recuperação. Disponibilidade externa não é necessária para esse simulado.
+O diretório privado para backups fica **fora do Git**. Use nomes novos para o snapshot e cópias, sem sobrescrever os do treino. Registre IP/nome do membro etcd, paths de certificados, endpoints e mounts lidos do manifesto existente. Prepare uma cópia protegida da PKI e configuração da VM para recuperação. Disponibilidade externa não é necessária para esse simulado.
 
 ## Tarefas
 

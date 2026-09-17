@@ -1,0 +1,12 @@
+# Values adicionais ao baseline do módulo03; não é um objeto Kubernetes.
+# Troque o CIDR reservado pelo IPv4 público real da estação, mantendo /32.
+service:
+  spec:
+    type: LoadBalancer
+    loadBalancerClass: service.k8s.aws/nlb
+    loadBalancerSourceRanges:
+      - 203.0.113.10/32
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: Projeto=curso-kubernetes,Ambiente=laboratorio

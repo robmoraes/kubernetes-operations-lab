@@ -9,4 +9,6 @@ allowVolumeExpansion: true
 parameters:
   type: gp3
   encrypted: "true"
+  kmsKeyId: alias/aws/ebs
   csi.storage.k8s.io/fstype: ext4
+  tagSpecification_1: Curso=kubernetes

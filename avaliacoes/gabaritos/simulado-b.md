@@ -2,6 +2,8 @@
 
 Avalie a execução em cluster descartável de um CP. Não há um comando universal de restore: nome do membro, endereço e mounts precisam corresponder à instalação. O [runbook do módulo 08](../../curso/08-manutencao.md) é a referência operacional deste curso.
 
+O candidato deve distinguir o auxiliar de manutenção/avaliação do cluster principal HA, selecionar o kubeconfig correto e usar o marcador `prova-b/marcador` da prova. Copiar endpoint, caminhos de uma tentativa anterior ou o marcador `curso-manutencao/prova` sem verificar o inventário não comprova execução correta. O preparo das ferramentas e de Traefik/Gateway ocorre fora do relógio.
+
 ## 1 — Backup (15)
 
 Deve haver leitura do static Pod etcd para identificar endpoints/certificados e snapshot por `etcdctl snapshot save`, sem copiar a quente o diretório de dados. Verifique `etcdutl snapshot status`, revisão, checksum e existência da cópia fora da máquina. O backup contém dados sensíveis da API. Ter um arquivo `.db` sem comprovar validade/cópia não atende à tarefa.

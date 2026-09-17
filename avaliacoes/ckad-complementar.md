@@ -4,7 +4,7 @@ Execute no namespace novo `curso-ckad`, a partir dos módulos 02–07 e09. Três
 
 ## Sessão 1 — ciclos de vida e recursos
 
-1. Construa uma imagem HTTP multiarch de uma aplicação sua. Registre Dockerfile, architectures e digest; comprove execução ARM64. Se não houver registry de laboratório, faça build local e registre que o teste de pull remoto ficou pendente.
+1. Construa uma imagem HTTP multiarch usando o servidor e o conteúdo da aplicação-base do módulo 02 ou uma aplicação própria. Não é necessário desenvolver outro sistema: o exercício é empacotar a página e seus arquivos em uma imagem reproduzível. Registre Dockerfile, arquiteturas e digest; comprove execução AMD64. Se tiver acesso a um ambiente ARM64, comprove também essa variante; sem registry de laboratório, faça build local e registre que o teste de pull remoto ficou pendente.
 2. Crie Pod com initContainer que prepara arquivo em emptyDir e container principal que serve o arquivo. Prove ordem de execução pelos logs e mostre que reiniciar só o container principal não executa novamente um initContainer já concluído no mesmo Pod.
 3. Acrescente sidecar de observação com encerramento apropriado para o tipo de workload; compare com sidecar nativo em initContainers/restartPolicy Always quando suportado. Explique por que um sidecar convencional que nunca termina pode impedir uma Job de concluir.
 4. Crie CronJob a cada 5 min, concurrencyPolicy Forbid, limites de histórico e deadline; crie uma Job manual a partir dela. Observe Complete e histórico. CronJob exige tarefas idempotentes; não é garantia de execução exatamente uma vez.

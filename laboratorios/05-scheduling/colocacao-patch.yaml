@@ -1,0 +1,18 @@
+# Strategic merge patch; usar kubectl patch, não apply sozinho.
+# Aplique a label curso.scheduling/alvo=true apenas ao worker do exercício.
+spec:
+  template:
+    spec:
+      tolerations:
+        - key: curso
+          operator: Equal
+          value: manutencao
+          effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: curso.scheduling/alvo
+                    operator: In
+                    values: ["true"]

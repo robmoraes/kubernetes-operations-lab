@@ -1,6 +1,8 @@
 # Plano de estudo e critérios de avanço
 
-Este curso parte da experiência de operar mais de 100 serviços em Docker Swarm. Linux, redes, DNS, TLS e containers são conhecimentos de entrada. A prioridade é aprender a API do Kubernetes, seus controllers, o agendamento e a operação do cluster. Uma pessoa experiente em Swarm já trabalha de forma declarativa: o salto aqui é conhecer novos recursos, relações e modos de falha.
+Este curso exige fundamentos de Linux, redes, DNS, TLS e containers. A prioridade é aprender a API do Kubernetes, seus controllers, o agendamento e a operação do cluster. Estado desejado, reconciliação e responsabilidades dos recursos são explicados diretamente, sem exigir experiência anterior em orquestração.
+
+O percurso pode ser concluído com a aplicação-base e os componentes fornecidos nos laboratórios. Uma aplicação própria, executada com Compose, Docker ou outro ambiente, é uma alternativa para contextualizar o projeto. Sua origem não altera os critérios de aprovação. Não é necessário acessar produção nem desenvolver software para começar; comparações entre plataformas ficam nos [extras opcionais](extras/README.md).
 
 ## Ritmo e método
 
@@ -11,16 +13,32 @@ Uma sessão de duas horas: 20 minutos de leitura, 70 de terminal, 20 de diagnós
 Faça cada laboratório em três passagens:
 
 1. **Guiada:** leia, antecipe o resultado, execute, observe a API e os logs.
-2. **Autônoma:** parta do enunciado, escreva os manifests e use a documentação oficial.
+2. **Autônoma:** parta do enunciado, escreva os manifests e use consultas pontuais (`kubectl explain`, ajuda dos comandos e suas notas), sem copiar a solução.
 3. **Operacional:** provoque a falha indicada, identifique a causa e recupere medindo tempo e impacto.
 
-Consultar documentação faz parte da competência. Copiar um comando sem explicar o efeito não conta como conclusão. Ajuda de um tutor é útil na passagem guiada; nas avaliações, tente primeiro e peça uma pista, não a solução inteira.
+Consultar documentação faz parte da competência, mas não será uma pré-leitura escondida. As aulas ensinam o necessário para seus objetivos e deixam fontes de aprofundamento em **Referências opcionais**, depois do fechamento. Quando houver treino de consulta, o exercício informa a pergunta, o recorte e quando parar. Abrir um link não implica estudar toda a página nem seguir seus outros links.
+
+Copiar um comando sem explicar o efeito não conta como conclusão. Ajuda de um tutor é útil na passagem guiada; nas avaliações, tente primeiro e peça uma pista, não a solução inteira. A autonomia aumenta por variações dos mecanismos já ensinados, não por omitir instruções necessárias. Se faltou uma explicação para cumprir um objetivo declarado, registre a lacuna do material; isso não é automaticamente falta de estudo sua.
+
+## O começo e o fim de uma aula
+
+Leia primeiro `Antes de começar` e `O que você vai conseguir fazer`. Esses trechos delimitam conhecimentos anteriores, ferramentas, ambiente e resultado. Pré-requisito significa uma etapa conhecida antes de iniciar, não uma descoberta no meio do capítulo. Os arquivos locais indicados nos procedimentos são parte da prática; não é necessário navegar pelo repositório inteiro.
+
+Depois percorra explicações, exemplos e exercícios na ordem. Faça pausas nos checkpoints, mesmo que um capítulo ocupe vários dias. No `Fechamento`, confira a síntese e as perguntas: se você consegue explicar e demonstrar o resultado da rubrica, a aula terminou. Pode avançar sem abrir as referências opcionais.
+
+Autossuficiência não significa cobrir toda uma especialidade. Cada capítulo explicita o que ainda fica para módulos posteriores ou aprofundamento. Regras atuais de contratação de exames e adaptação a versões fora da base do curso são verificações futuras, não requisitos de leitura para a primeira aula.
+
+## Continuidade dos ambientes
+
+O cluster-base começa em 1.35 no módulo 01. Sua primeira construção e destruição são manuais; depois disso, o Terraform de apoio pode recriar a infraestrutura e o primeiro CP entre sessões, enquanto join dos workers e restauração dos objetos continuam manuais. Preserve manifests, versões e evidências, não recursos cobrados ociosos. O módulo 08 prepara um auxiliar separado: nele você restaura etcd e ensaia 1.35 → 1.36. Reserve orçamento para essa janela adicional e descarte o auxiliar após salvar evidências e backups protegidos.
+
+Os módulos 09/10 voltam ao cluster-base reconstruído; o EKS do módulo 11 é outro ambiente, com acesso isolado e limpeza própria. O módulo 12 usa a reconstrução corrente para o projeto. Cada aula indica o estado lógico que deve ser exportado ou reaplicado antes de destruir a infraestrutura física.
 
 ## Sequência
 
 | Etapa | Estudo e prática | Evidência necessária |
 |---|---|---|
-| 00 | [Como estudar](curso/00-como-estudar.md) | Inventário do lab, agenda, critérios de custo e registro de versões |
+| 00 | [Como estudar](curso/00-como-estudar.md) | Inventário inicial da aplicação, plano isolado do lab, agenda e teto de gasto |
 | 01 | [Control plane manual](curso/01-control-plane.md) | 1 CP + 2 workers, CNI saudável e explicação dos static Pods |
 | 02 | [Workloads](curso/02-workloads.md) | App, probes, configuração, atualização e rollback |
 | 03 | [Rede](curso/03-rede.md) | DNS, Services, Traefik, Ingress e Gateway API testados |
@@ -37,7 +55,7 @@ Consultar documentação faz parte da competência. Copiar um comando sem explic
 
 ## Marcos profissionais
 
-**Marco 1 — Publicar e explicar (00–03).** Você consegue traduzir um serviço do Swarm para Deployment + Service, explicar quem recria um Pod e diagnosticar o caminho cliente → Traefik → Service → Pod. Não se limite à aplicação de exemplo: migre um serviço seu sem dados de produção.
+**Marco 1 — Publicar e explicar (00–03).** Você consegue representar os requisitos de um serviço stateless com Deployment + Service, explicar quem recria um Pod e diagnosticar o caminho cliente → Traefik → Service → Pod. Além de reproduzir a base guiada, publique uma variação independente dela ou um componente de aplicação própria, com dados de laboratório. Compare o resultado com o inventário do módulo 00.
 
 **Marco 2 — Operar (04–08).** Você distingue falha de aplicação, scheduler, CNI, CSI e control plane; recupera dados e faz manutenção com uma sequência verificada. Complete o simulado A depois do módulo 09, que fornece os exercícios de empacotamento usados na avaliação.
 
@@ -45,7 +63,7 @@ Consultar documentação faz parte da competência. Copiar um comando sem explic
 
 ## Aprovação de um módulo
 
-A rubrica específica de cada capítulo é a referência. Para marcar o módulo concluído, entregue o laboratório, o desafio autônomo e evidência de recuperação. Registre as ajudas recebidas. Se passou pelo roteiro mas não consegue repetir o desafio, marque **em prática**.
+A rubrica específica de cada capítulo é a referência. O módulo 00 termina com seu checklist de preparação, sem exigir instalação nem recuperação executada. Nos módulos práticos, entregue o laboratório, o desafio autônomo e evidência de recuperação para marcar a conclusão. Registre as ajudas recebidas. Se passou pelo roteiro mas não consegue repetir o desafio, marque **em prática**.
 
 O projeto final usa rubrica de 100 pontos no módulo 12. A meta interna dos simulados é **80/100 em duas tentativas independentes**, sem falhas críticas de contexto, perda de dados ou permissões excessivas. Isso é um critério de treino do curso, não a nota oficial de uma prova nem garantia de contratação.
 

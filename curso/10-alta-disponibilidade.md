@@ -1,9 +1,39 @@
 # 10 — Alta disponibilidade, quórum e falhas por zona
 
-**Tempo sugerido:** 18–24 horas. **Pré-requisitos:** backup/restore do módulo 08 concluído,
-cluster descartável, inventário dos nós e orçamento para a janela de laboratório.
-O resultado é uma topologia de três control planes, compreendida e testada, com um
-relatório que distingue disponibilidade da API, disponibilidade da aplicação e durabilidade.
+## Antes de começar
+
+Reserve **18–24 horas**. Conclua [instalação manual](01-control-plane.md),
+[rede](03-rede.md), [storage](04-storage.md), [scheduling](05-scheduling.md) e
+[backup/restore](08-manutencao.md). Tenha a aplicação e o arquivo persistente desses
+laboratórios disponíveis, sem dados reais. Use kubectl na estação; os utilitários etcd
+precisam ser preparados também no CP1 principal, conforme indicado antes de seu uso.
+Não execute os ensaios em produção nem misture máquinas de outros clusters.
+
+O ambiente suportado para HA regional aqui é EC2 em **três AZs da mesma VPC**, com
+três control planes dedicados e workers com capacidade nas zonas sobreviventes. Reserve
+uma janela com orçamento para máquinas, NLB, DNS e discos. Anote IPs privados, IDs EC2,
+subnets, AZs e Security Groups. O acesso à VPC por VPN ou bastion e ao console AWS deve
+estar funcionando, como no módulo 01. Uma estação fora da VPC precisa dessa rota para
+chegar ao endpoint interno; criar um NLB interno não abre essa rota automaticamente.
+
+Antes de iniciar, confirme `kubectl -n curso-storage get deployment/arquivo pvc/dados`.
+Se você encerrou o módulo 04, repita seu laboratório A de storage no cluster principal,
+incluindo volume/PV/PVC/consumidor e arquivo de prova, ou a alternativa local declarando
+sua menor mobilidade. Não basta reaplicar só o Deployment com um PVC inexistente.
+Registre o conteúdo de `/dados/prova.txt` e os IDs de volume antes das falhas; esse
+será o dado comparado na recuperação. Inclua a recriação do volume no orçamento.
+
+O exemplo HAProxy abaixo permite aprender o balanceamento em uma máquina Ubuntu extra;
+um único HAProxy não satisfaz a prova de HA do endpoint. O caminho NLB multi-AZ que o
+substitui também é ensinado. Use o [plano de falha](../laboratorios/10-alta-disponibilidade/plano-falha.md)
+para registrar exatamente o que será interrompido e como restaurar.
+
+## O que você vai conseguir fazer
+
+- Preparar e verificar um endpoint TCP estável para a API.
+- Adicionar dois control planes ao cluster e comprovar três membros etcd saudáveis.
+- Interromper uma API ou um nó de laboratório, observar o impacto e recuperar o conjunto.
+- Separar HA de control plane, capacidade da aplicação e limitação de zona dos dados.
 
 ## O que três control planes resolvem
 
@@ -33,6 +63,11 @@ Use três EC2s dedicadas ao control plane, uma por AZ, com a mesma minor Kuberne
 containerd configurado e IPs privados alcançáveis. Adicione workers em outras AZs para
 ensaiar continuidade da aplicação. Repita o preparo de SO do módulo 01, sem executar
 `kubeadm init` nos control planes adicionais.
+O ensaio de upgrade do módulo 08 acontece em cluster auxiliar separado. Aqui use o
+cluster principal **1.35**, preservado para GitOps e o projeto final; não faça downgrade.
+Copie o inventário do módulo 01, atribuindo nomes únicos `cp2` e `cp3`; mantenha o
+hostname `cp1` original. Use Ubuntu 24.04 AMD64, 2 vCPU/4 GiB e disco gp3 por CP como
+baseline didático. Confira o patch com `kubeadm version -o short` nos três antes do join.
 
 No primeiro init, `controlPlaneEndpoint` deve ser um DNS estável. Confira:
 
@@ -63,31 +98,79 @@ não movem instâncias nem volumes entre zonas.
 
 ## Laboratório A — Endpoint estável
 
-Na AWS, crie um Network Load Balancer interno de laboratório com subnets em três AZs.
-O cliente deve chegar à VPC por VPN/bastion. Crie target group TCP/6443, registre os
-IPs ou instâncias dos control planes e listener TCP/6443. Ative balanceamento entre
-zonas ou mantenha targets saudáveis em cada AZ e compreenda o comportamento escolhido.
-Use TCP passthrough: o certificado da API continua sendo validado pelo cliente.
+Um balanceador TCP recebe conexões em uma porta e escolhe um backend saudável. Ele
+não precisa terminar o TLS: em passthrough, o cliente continua validando o certificado
+do API server para `lab-k8s.internal`. Health check TCP prova apenas abertura de porta;
+`/readyz` da API acrescenta a verificação de prontidão do componente.
 
-Crie um registro DNS privado estável apontando para o NLB. Registre o ARN e tags de
-projeto para posterior limpeza. Restrinja 6443 a clientes e nós do curso; 2379/2380
-devem conectar apenas os pares/control planes necessários. 10250 e o tráfego CNI
-precisam seguir a matriz de portas dos módulos 01/03. Não exponha etcd publicamente.
+**Exemplo local guiado:** em uma VM Ubuntu dedicada chamada `lb1`, instale
+`sudo apt-get update` e `sudo apt-get install -y haproxy`. Para os testes de conexão,
+instale `netcat-openbsd` na estação e nos nós Ubuntu com `sudo apt-get install -y netcat-openbsd`.
+`getent` já faz parte do sistema. Copie o arquivo
+[`haproxy.cfg.example`](../laboratorios/10-alta-disponibilidade/haproxy.cfg.example)
+da estação para `/tmp/haproxy-curso.cfg` dessa VM com `scp`. Substitua seus três IPs
+pelos IPs privados reais de CP1/CP2/CP3. Backends ainda sem API permanecerão fora da
+rotação até o join; CP1 deve estar funcionando antes de mudar o endpoint.
 
-Health check TCP confirma abertura de porta; para avaliar prontidão real, teste também
-`/readyz` da API. Não configure um balanceador de HTTP da aplicação para mediar a API.
+```bash
+# Em lb1, máquina exclusiva do exercício:
+sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.antes-curso
+sudo install -m 0644 /tmp/haproxy-curso.cfg /etc/haproxy/haproxy.cfg
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg
+sudo systemctl restart haproxy
+sudo systemctl status haproxy --no-pager
+sudo ss -lntp 'sport = :6443'
+```
+
+Espere `Configuration file is valid`, serviço ativo e listener 6443. Na repetição,
+não sobrescreva o backup original. Restrinja o firewall de lb1 aos clientes/nós do
+laboratório e libere lb1 → CPs TCP/6443. Na estação e **em todos os nós**, edite
+`/etc/hosts` com `sudoedit`: substitua a entrada antiga de `lab-k8s.internal` pelo IP
+de lb1, mantendo uma única entrada para esse nome. Teste resolução e TCP em todos;
+`kubectl` usa kubeconfig administrativo apenas na estação ou CP1, nunca copiado aos workers.
+Se falhar, restaure o mapeamento anterior para CP1 e diagnostique lb1 sem perder acesso.
 
 ```bash
 getent hosts lab-k8s.internal
 nc -vz lab-k8s.internal 6443
+# Somente na estação com kubeconfig, não em workers:
 kubectl get --raw='/readyz?verbose'
 ```
 
-Como alternativa econômica de estudo, o arquivo
-[`haproxy.cfg.example`](../laboratorios/10-alta-disponibilidade/haproxy.cfg.example)
-implementa passthrough TCP. Instale HAProxy em uma máquina própria, ajuste os IPs,
-valide com `haproxy -c -f /etc/haproxy/haproxy.cfg` e reinicie o serviço.
-Um único HAProxy continua sendo ponto único de falha; esse arranjo não passa no gate HA.
+Esse exemplo permite provar balanceamento, mas lb1 continua sendo ponto único de
+falha. Para a entrega HA AWS, substitua-o por um NLB seguindo estes passos no console,
+todos na mesma região/VPC do inventário:
+
+1. Em **EC2 → Target Groups → Create**, escolha tipo **Instances**, protocolo TCP,
+   porta 6443 e a VPC do laboratório. Use health check TCP/6443. Registre CP1; registre
+   CP2/CP3 após iniciarem suas APIs. Não registre os workers.
+2. Em **EC2 → Load Balancers → Create → Network Load Balancer**, escolha **Internal**,
+   IPv4 e uma subnet por AZ. Crie/anexe um Security Group que aceite 6443 apenas dos
+   SGs dos nós e do CIDR de administração via VPN/bastion. Sua saída deve permitir
+   6443 para os CPs. No SG dos CPs, permita essa porta a partir do SG do NLB.
+3. Crie listener **TCP:6443 → target group**. Em atributos do NLB, habilite
+   **Cross-zone load balancing** para que as três entradas possam alcançar CP1 durante
+   o crescimento. Isso também deve entrar no modelo de custos/tráfego entre AZs.
+4. Aguarde NLB **Active** e CP1 **Healthy** no target group. Registre DNS e ARN do NLB.
+   Em **Route 53 → Hosted zones**, identifique primeiro a zona privada do laboratório
+   usada no módulo 01. Se ela já contiver o nome, atualize somente o registro
+   `lab-k8s.internal` para A **Alias** desse NLB, preservando os demais registros.
+   Se ainda não houver zona para o nome, crie a zona **privada** `lab-k8s.internal`,
+   associada à VPC, e o registro A no ápice (nome vazio), Alias para esse NLB.
+   Não crie uma zona duplicada nem altere uma zona de produção. DNS support e DNS
+   hostnames devem estar habilitados na VPC.
+5. Remova a entrada estática `lab-k8s.internal` de `/etc/hosts` em todos os nós e na
+   estação que usa o resolvedor privado. Uma entrada antiga tem precedência e poderia
+   mascarar uma falha do balanceador. Execute `getent`/`nc` nos nós e `/readyz` pela estação.
+
+A estação fora da VPC pode executar kubectl no bastion já configurado para usar o DNS
+da VPC; não basta consultar um DNS público. Resultado esperado: o mesmo nome alcança
+o NLB, CP1 atende a API e certificados continuam válidos. Não fixe um IP transitório
+do NLB no `/etc/hosts`. Preserve acesso administrativo direto para recuperação.
+
+As portas entre CPs, etcd e kubelet seguem o módulo 01: etcd 2379/2380 não é público;
+CNI e 10250 precisam continuar alcançáveis entre os pares autorizados. O balanceador
+da API não substitui o Traefik da aplicação.
 
 ## Laboratório B — Adicionar control planes
 
@@ -126,10 +209,30 @@ kubectl -n kube-system get leases
 kubectl get --raw='/readyz?verbose'
 ```
 
-Use `etcdctl endpoint status --cluster -w table` e `endpoint health --cluster` com os
-certificados e procedimento do módulo 08. Confirme três membros e um líder. Ter três
-pods com nome etcd não demonstra que o conjunto esteja saudável.
-Depois das adesões, remova o token temporário pelo ID com `kubeadm token delete ID`.
+O módulo 08 instalou ferramentas em um **CP auxiliar**, não necessariamente no CP1
+principal. Antes de usar etcdctl aqui, confira a imagem real com
+`sudo sed -n '1,100p' /etc/kubernetes/manifests/etcd.yaml` no CP1. Repita **somente a
+instalação/verificação de etcdctl e etcdutl** ensinada na preparação do módulo 08,
+selecionando a versão upstream correspondente a essa imagem e arquitetura AMD64.
+Não execute backup/restore nem copie binários de versão diferente por suposição.
+Confirme `etcdctl version` no CP1. O endpoint local fornece os endereços dos demais
+membros; `--cluster` verifica o conjunto descoberto:
+
+```bash
+sudo etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key endpoint status --cluster -w table
+sudo etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt \
+  --key=/etc/kubernetes/pki/etcd/healthcheck-client.key endpoint health --cluster
+```
+
+Confirme três membros, todos saudáveis, e apenas um líder. Ter três pods com nome etcd
+não demonstra que o conjunto esteja saudável. Se o binário não estiver no PATH do sudo,
+use o caminho absoluto instalado no módulo 08.
+Depois das adesões, no CP1, remova o token temporário pelo ID com `sudo kubeadm token delete ID`.
 
 ## Laboratório C — Falha de API sem perder o nó
 
@@ -149,6 +252,7 @@ fora da pasta observada. Não deixe cópias `.bak` dentro de `manifests`.
 
 ```bash
 hostname
+sudo test ! -e /var/tmp/kube-apiserver-curso.yaml || { printf 'Já existe um manifesto pausado; identifique a tentativa anterior.\n'; exit 1; }
 sudo mv /etc/kubernetes/manifests/kube-apiserver.yaml /var/tmp/kube-apiserver-curso.yaml
 # Após observar a falha e a retirada do target, restaure imediatamente:
 sudo mv /var/tmp/kube-apiserver-curso.yaml /etc/kubernetes/manifests/kube-apiserver.yaml
@@ -173,26 +277,52 @@ Interrompa o teste se houver um segundo membro etcd indisponível. Restaurar dis
 dos membros originais é diferente de recuperar um snapshot após perda definitiva de quórum.
 A segunda situação pertence ao runbook de disaster recovery e a um laboratório isolado.
 
-## Entrega e avaliação
+## Dimensionamento e desafio independente
 
 Produza diagrama com AZs, endpoint, membros etcd, workers e volumes. Informe RTO medido
 da API e da aplicação separadamente. RPO é a quantidade de dados que se aceita perder;
 backup a cada hora não garante RPO de uma hora se o último backup não puder ser restaurado.
 
-Gate: API acessível com um CP parado; três membros saudáveis após retorno; ausência de
-perda no arquivo persistente da aplicação; explicação do caso PVC preso à AZ.
-Desafio autônomo: planejar capacidade N-1 por zona e comparar etcd stacked com externo.
+Para planejar capacidade N-1, retire uma zona da conta. Exemplo: cada AZ oferece 4
+vCPU alocáveis de workers; perder uma deixa 8. Se a soma dos requests das aplicações
+e componentes agendáveis for 9 vCPU, três zonas não tornam essa aplicação recuperável.
+Repita para memória e número de pods, reservando espaço para rollouts e componentes.
+Restrições rígidas de topologia e volumes podem impedir agendamento mesmo com folga total.
+
+Desafio: usando o inventário real, calcule CPU/memória disponíveis após perder cada AZ,
+liste workloads que cabem e os PVCs bloqueados por zona. Faça uma única simulação de
+perda de AZ com plano preenchido, recuperação pronta e capacidade suficiente.
+O exercício termina quando hipóteses e observações forem comparadas, incluindo limitações.
 Pergunta de entrevista: por que dois CPs podem ser pior investimento que um sem elevar
 a tolerância a falhas de etcd? Responda usando quórum e domínios de falha.
 
-Ao terminar a janela, remova somente o NLB/target group/DNS e máquinas adicionais
-identificados no inventário, após migrar ou encerrar o cluster de exercício. Verifique
+Mantenha o cluster manual, Argo CD e endpoint para concluir o módulo 12; o EKS11 será
+temporário e separado. Agende as janelas próximas para controlar custos. Se decidir
+encerrar este cluster antes, preserve Git/backups/evidências e registre que reconstruí-lo
+pelos módulos 01/03/04/09 será necessário antes do projeto final, com nova janela e custo.
+
+**Após concluir o projeto final**, remova somente NLB/target group/DNS e máquinas
+identificados no inventário, após migrar ou encerrar esse cluster de exercício. Verifique
 EBS, snapshots, IPs públicos e balanceadores retidos; parar EC2 não interrompe toda cobrança.
 
-## Fontes primárias consultadas em 2026-09-10
+## Fechamento
 
-- [kubeadm HA](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/).
-- [Escolha de topologia](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/).
-- [Endpoint compartilhado no init](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/).
-- [etcd: tolerância a falhas](https://etcd.io/docs/v3.6/faq/).
-- [AWS NLB: target groups](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html).
+Três CPs toleram a perda de um membro etcd; o endpoint, a capacidade dos workers e os
+dados precisam de seus próprios mecanismos de continuidade. Explique por que um
+cluster com três CPs e um HAProxy único ainda tem ponto único de falha.
+
+Avance quando: o endpoint NLB estiver funcional; a API permanecer acessível com um CP
+parado; os três membros recuperarem saúde; o arquivo persistente permanecer igual;
+e seu relatório separar RTO da API, RTO da aplicação e o caso EBS preso à zona.
+Se praticou apenas HAProxy/local, marque o mecanismo de balanceamento como concluído
+e a prova multi-AZ como pendente. etcd externo e HA entre regiões não são exigidos aqui.
+
+## Referências opcionais
+
+Fontes verificadas em 12/09/2026; nenhuma delas é etapa obrigatória do laboratório.
+
+- [kubeadm HA](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/) detalha variações de adesão e distribuição de certificados.
+- [Topologias](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ha-topology/) permite comparar custos e isolamento de etcd externo e stacked.
+- [Init e endpoint](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) aprofunda o bootstrap e suas opções.
+- [etcd e falhas](https://etcd.io/docs/v3.6/faq/) explica quórum, latência e dimensionamento de membros.
+- [NLB target groups](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html) amplia health checks, tipos de target e comportamento entre zonas.

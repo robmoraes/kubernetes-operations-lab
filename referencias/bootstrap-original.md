@@ -1,4 +1,4 @@
-> Histórico preservado do README anterior. Não use esta página como roteiro inicial. Comece pelo [curso manual](../curso/01-control-plane.md); o script precisa de revisão/teste em VM descartável antes de uso. Nos blocos abaixo, os comandos eram executados na raiz do repositório.
+> Registro histórico do README anterior. O script de bootstrap foi removido em 11/09/2026; os comandos abaixo documentam seu uso antigo e não devem ser executados. Para instalar o cluster, siga o [procedimento manual do módulo 01](../curso/01-control-plane.md). O script antigo pode ser recuperado pelo histórico do Git.
 
 # Kubernetes Cluster
 
@@ -14,7 +14,7 @@
 
 ## Bootstrap ARM64
 
-O script [`bootstrap-kubernetes-arm64.sh`](../bootstrap-kubernetes-arm64.sh) prepara
+O antigo script `bootstrap-kubernetes-arm64.sh` preparava
 hosts Debian/Ubuntu ARM64 para um cluster criado com `kubeadm`. Ele instala e
 configura containerd, kubelet, kubeadm e kubectl, desabilita swap e aplica os
 parametros de kernel necessarios.

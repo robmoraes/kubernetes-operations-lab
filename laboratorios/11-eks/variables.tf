@@ -42,7 +42,7 @@ variable "admin_public_cidr" {
 
 variable "addon_versions" {
   type        = map(string)
-  description = "Versões exatas do describe-addon-versions compatíveis com Kubernetes e ARM64."
+  description = "Versões exatas do describe-addon-versions compatíveis com Kubernetes e AMD64."
   validation {
     condition = alltrue([
       for name in ["vpc-cni", "coredns", "kube-proxy", "eks-pod-identity-agent", "aws-ebs-csi-driver"] :
@@ -54,5 +54,5 @@ variable "addon_versions" {
 
 variable "instance_type" {
   type    = string
-  default = "t4g.medium"
+  default = "c7i-flex.large"
 }

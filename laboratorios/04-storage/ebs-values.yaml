@@ -1,4 +1,4 @@
-# Valores Helm, não um objeto Kubernetes. Confirme a versão do chart na aula.
+# Values do chart 2.63.1 / driver 1.63.1, não um objeto Kubernetes.
 controller:
   region: sa-east-1
   replicaCount: 1
@@ -6,3 +6,5 @@ controller:
     curso.ebs/controller: "true"
 node:
   enableWindows: false
+  nodeSelector:
+    curso.ebs/node: "true"

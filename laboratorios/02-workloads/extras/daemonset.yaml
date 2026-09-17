@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agente-aula
+  namespace: curso
+spec:
+  selector:
+    matchLabels:
+      app: agente-aula
+  template:
+    metadata:
+      labels:
+        app: agente-aula
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agente
+          image: busybox:1.37.0
+          command: ["sh", "-ec", "printf 'Pod: '; hostname; printf 'Nó: %s\n' \"$NODE_NAME\"; exec sleep 86400"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {cpu: 50m, memory: 16Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

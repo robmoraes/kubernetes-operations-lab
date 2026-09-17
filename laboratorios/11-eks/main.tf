@@ -86,11 +86,11 @@ resource "aws_iam_role_policy_attachment" "node" {
 
 resource "aws_eks_node_group" "lab" {
   cluster_name    = aws_eks_cluster.lab.name
-  node_group_name = "arm64-lab"
+  node_group_name = "amd64-lab"
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = aws_subnet.private[*].id
   version         = var.kubernetes_version
-  ami_type        = "AL2023_ARM_64_STANDARD"
+  ami_type        = "AL2023_x86_64_STANDARD"
   instance_types  = [var.instance_type]
   capacity_type   = "ON_DEMAND"
   disk_size       = 30
