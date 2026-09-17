@@ -18,3 +18,5 @@ secrets.local.yaml
 *.tfplan
 *.tfvars
 *.tfvars.json
+notas-privadas/
+*.sw?

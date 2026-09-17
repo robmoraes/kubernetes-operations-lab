@@ -8,6 +8,8 @@ import subprocess
 import sys
 from urllib.parse import unquote, urlsplit
 
+from pedagogia import chapter_errors, prose_lines
+
 try:
     import yaml
 except ImportError:
@@ -16,7 +18,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 IGNORED = {".git", ".terraform", ".venv", "node_modules", ".local", "__pycache__"}
 errors = []
-counts = {"markdown": 0, "links": 0, "yaml": 0, "json": 0, "shell": 0}
+counts = {"markdown": 0, "links": 0, "yaml": 0, "json": 0, "shell": 0, "capítulos": 0}
 templates = []
 
 
@@ -43,21 +45,13 @@ def fail(path, message):
 
 def check_markdown(path, content):
     counts["markdown"] += 1
-    fence = None
-    prose = []
-    for number, line in enumerate(content.splitlines(), 1):
-        marker = re.match(r"^\s*(`{3,}|~{3,})(.*)$", line)
-        if marker:
-            token, rest = marker.groups()
-            if fence is None:
-                fence = (token[0], len(token))
-            elif token[0] == fence[0] and len(token) >= fence[1] and not rest.strip():
-                fence = None
-            continue
-        if fence is None:
-            prose.append((number, line))
-    if fence:
+    prose, unclosed = prose_lines(content)
+    if unclosed:
         fail(path, "bloco de código sem fechamento")
+    if path.parent == ROOT / "curso":
+        counts["capítulos"] += 1
+        for message in chapter_errors(prose):
+            fail(path, message)
     for number, line in prose:
         for target in re.findall(r"\[[^\]\n]+\]\(([^)\n]+)\)", line):
             target = target.strip()
@@ -127,3 +121,4 @@ if templates:
     print("Templates Helm exigem helm lint/template; não foram tratados como YAML pronto:")
     print("\n".join(f"- {template}" for template in templates))
 print("Não valida schemas Kubernetes, disponibilidade de imagens, permissões AWS ou comportamento em cluster.")
+print("Contrato editorial verificado; a coerência pedagógica e a suficiência das explicações exigem revisão humana.")
