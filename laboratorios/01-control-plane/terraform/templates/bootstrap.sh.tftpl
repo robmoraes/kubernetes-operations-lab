@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly NODE_NAME="${node_name}"
+readonly NODE_ROLE="${node_role}"
+readonly KUBERNETES_VERSION="${kubernetes_version}"
+readonly KUBERNETES_PACKAGE="${kubernetes_package}"
+readonly BOOTSTRAP_DIR="/var/lib/curso-bootstrap"
+readonly BOOTSTRAP_LOG="/var/log/curso-bootstrap.log"
+
+install -d -m 0700 "$BOOTSTRAP_DIR"
+touch "$BOOTSTRAP_LOG"
+chmod 0600 "$BOOTSTRAP_LOG"
+exec > >(tee -a "$BOOTSTRAP_LOG" | logger -t curso-bootstrap -s 2>/dev/console) 2>&1
+trap 'status=$?; printf "CURSO_BOOTSTRAP_FAILED node=%s line=%s status=%s\n" "$NODE_NAME" "$LINENO" "$status"; exit "$status"' ERR
+
+printf 'Inicio do bootstrap: node=%s role=%s\n' "$NODE_NAME" "$NODE_ROLE"
+hostnamectl set-hostname "$NODE_NAME"
+printf '%s\n' 'preserve_hostname: true' >/etc/cloud/cloud.cfg.d/99-curso-hostname.cfg
+
+sed -i '/# curso-kubernetes begin/,/# curso-kubernetes end/d' /etc/hosts
+cat >>/etc/hosts <<'HOSTS'
+# curso-kubernetes begin
+${cp_private_ip} cp1 ${control_plane_endpoint}
+${worker1_private_ip} worker1
+${worker2_private_ip} worker2
+# curso-kubernetes end
+HOSTS
+
+export DEBIAN_FRONTEND=noninteractive
+for attempt in $(seq 1 12); do
+  if apt-get update; then
+    break
+  fi
+  if [[ "$attempt" == 12 ]]; then
+    printf '%s\n' 'apt-get update não convergiu.' >&2
+    exit 1
+  fi
+  sleep 10
+done
+
+apt-get install -y ca-certificates curl gpg apt-transport-https containerd
+
+swapoff -a
+sed -ri '/^[^#].*[[:space:]]swap[[:space:]]/s/^/# curso-disabled-swap /' /etc/fstab
+
+cat >/etc/modules-load.d/kubernetes.conf <<'MODULES'
+overlay
+br_netfilter
+MODULES
+modprobe overlay
+modprobe br_netfilter
+
+cat >/etc/sysctl.d/99-kubernetes.conf <<'SYSCTL'
+net.ipv4.ip_forward = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+SYSCTL
+sysctl --system
+
+install -d -m 0755 /etc/containerd
+containerd config default >/etc/containerd/config.toml
+sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+systemctl enable --now containerd
+systemctl restart containerd
+systemctl is-active --quiet containerd
+
+cat >/etc/crictl.yaml <<'CRICTL'
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+debug: false
+CRICTL
+
+install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v${kubernetes_minor}/deb/Release.key \
+  | gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+printf '%s\n' 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${kubernetes_minor}/deb/ /' \
+  >/etc/apt/sources.list.d/kubernetes.list
+apt-get update
+apt-get install -y \
+  "kubelet=$KUBERNETES_PACKAGE" \
+  "kubeadm=$KUBERNETES_PACKAGE" \
+  "kubectl=$KUBERNETES_PACKAGE"
+apt-mark hold kubelet kubeadm kubectl
+systemctl enable kubelet
+
+if systemctl is-active --quiet ufw; then
+  ufw disable
+fi
+
+if systemctl is-active --quiet NetworkManager; then
+  install -d -m 0755 /etc/NetworkManager/conf.d
+  cat >/etc/NetworkManager/conf.d/calico.conf <<'NETWORKMANAGER'
+[keyfile]
+unmanaged-devices=interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico;interface-name:vxlan-v6.calico;interface-name:wireguard.cali;interface-name:wg-v6.cali
+NETWORKMANAGER
+  nmcli general reload conf
+fi
+
+touch "$BOOTSTRAP_DIR/host-prepared"
+printf 'Host preparado: node=%s Kubernetes=%s\n' "$NODE_NAME" "$KUBERNETES_VERSION"
+
+if [[ "$NODE_ROLE" == "control-plane" ]]; then
+  cat >/etc/kubernetes-kubeadm-init.yaml <<KUBEADM
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+bootstrapTokens:
+  - ttl: 1m
+localAPIEndpoint:
+  advertiseAddress: ${cp_private_ip}
+  bindPort: 6443
+nodeRegistration:
+  name: cp1
+  criSocket: unix:///run/containerd/containerd.sock
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+clusterName: curso-kubeadm
+kubernetesVersion: v${kubernetes_version}
+controlPlaneEndpoint: ${control_plane_endpoint}:6443
+apiServer:
+  certSANs:
+    - ${control_plane_endpoint}
+networking:
+  podSubnet: ${pod_cidr}
+  serviceSubnet: ${service_cidr}
+KUBEADM
+
+  kubeadm config images pull --config /etc/kubernetes-kubeadm-init.yaml
+  kubeadm init --config /etc/kubernetes-kubeadm-init.yaml --skip-token-print
+
+  install -d -o ubuntu -g ubuntu -m 0700 /home/ubuntu/.kube
+  install -o ubuntu -g ubuntu -m 0600 /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+  kubectl get --raw='/readyz'
+
+  install -d -m 0700 "$BOOTSTRAP_DIR/calico"
+  curl -fsSL \
+    "https://raw.githubusercontent.com/projectcalico/calico/v${calico_version}/manifests/v1_crd_projectcalico_org.yaml" \
+    -o "$BOOTSTRAP_DIR/calico/crds.yaml"
+  curl -fsSL \
+    "https://raw.githubusercontent.com/projectcalico/calico/v${calico_version}/manifests/tigera-operator.yaml" \
+    -o "$BOOTSTRAP_DIR/calico/operator.yaml"
+  kubectl create -f "$BOOTSTRAP_DIR/calico/crds.yaml"
+  kubectl create -f "$BOOTSTRAP_DIR/calico/operator.yaml"
+  kubectl wait --for=condition=Established crd/installations.operator.tigera.io --timeout=180s
+
+  cat >"$BOOTSTRAP_DIR/calico/installation.yaml" <<CALICO
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  calicoNetwork:
+    linuxDataplane: Iptables
+    bgp: Disabled
+    ipPools:
+      - name: default-ipv4-ippool
+        blockSize: 26
+        cidr: ${pod_cidr}
+        encapsulation: VXLAN
+        natOutgoing: Enabled
+        nodeSelector: all()
+CALICO
+  kubectl apply -f "$BOOTSTRAP_DIR/calico/installation.yaml"
+
+  touch "$BOOTSTRAP_DIR/control-plane-ready"
+  printf 'CURSO_CONTROL_PLANE_READY endpoint=${control_plane_endpoint}:6443 version=%s\n' "$KUBERNETES_VERSION"
+else
+  printf 'CURSO_WORKER_PREPARED node=%s aguardando_join=true\n' "$NODE_NAME"
+fi

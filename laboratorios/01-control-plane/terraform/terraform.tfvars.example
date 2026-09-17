@@ -1,0 +1,31 @@
+region            = "us-east-1"
+availability_zone = "us-east-1a"
+cluster_name      = "kubelab"
+owner             = "dslab"
+cost_center       = "estudo-kubernetes"
+
+# Modulo é somente uma dimensão informativa de relatório.
+module_id = "m02"
+
+# Gere um LabRun imutável novo e ajuste a expiração antes de cada apply.
+lab_run    = "run-20260915T120000Z"
+expires_on = "2026-09-16"
+
+# true: prepara todos os hosts e inicializa somente o control plane.
+# false: entrega três Ubuntu limpos para a instalação integralmente manual.
+bootstrap_control_plane = true
+
+instance_type    = "c7i-flex.large"
+root_volume_size = 30
+
+vpc_cidr     = "10.42.0.0/16"
+subnet_cidr  = "10.42.10.0/24"
+pod_cidr     = "172.20.0.0/16"
+service_cidr = "10.96.0.0/12"
+
+kubernetes_version = "1.35.8"
+calico_version     = "3.32.2"
+
+# Depois do primeiro apply, copie o output ubuntu_ami_id para cá se quiser
+# garantir a mesma imagem exata na reconstrução manual.
+# ubuntu_ami_id = "ami-00000000000000000"
